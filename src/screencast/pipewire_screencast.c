@@ -294,12 +294,18 @@ fixate_format:
 	params[0] = build_buffer(&b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
 			cast->screencopy_frame_info[cast->buffer_type].stride, data_type);
 
-	params[1] = spa_pod_builder_add_object(&b,
+	params[1] = spa_pod_builder_add_object (
+			&b,
+			SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+			SPA_PARAM_META_type, SPA_POD_Id (SPA_META_VideoCrop),
+			SPA_PARAM_META_size, SPA_POD_Int (sizeof (struct spa_meta_region)));
+
+	params[2] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	pw_stream_update_params(stream, params, 2);
+	pw_stream_update_params(stream, params, 3);
 }
 
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
@@ -417,6 +423,16 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
 		logprint(TRACE, "pipewire: timestamp %"PRId64, h->pts);
+	}
+	struct spa_meta_region *video_crop;
+	video_crop = spa_buffer_find_meta_data (spa_buf, SPA_META_VideoCrop,
+				sizeof(*video_crop));
+	if (video_crop)
+	{
+		video_crop->region.position.x = 0;
+		video_crop->region.position.y = 0;
+		video_crop->region.size.width = cast->current_frame.xdpw_buffer->width;
+		video_crop->region.size.height = cast->current_frame.xdpw_buffer->height;
 	}
 
 	if (buffer_corrupt) {
