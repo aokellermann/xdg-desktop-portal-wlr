@@ -203,7 +203,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	struct pw_stream *stream = cast->stream;
 	uint8_t params_buffer[3][1024];
 	struct spa_pod_dynamic_builder b[3];
-	const struct spa_pod *params[4];
+	const struct spa_pod *params[5];
 	uint32_t blocks;
 	uint32_t data_type;
 
@@ -322,7 +322,12 @@ fixate_format:
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoTransform),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_videotransform)));
 
-	params[3] = spa_pod_builder_add_object(&b[2].b,
+    params[3] = spa_pod_builder_add_object(&b[1].b,
+        SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+        SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
+        SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
+
+	params[4] = spa_pod_builder_add_object(&b[2].b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoDamage),
 		SPA_PARAM_META_size, SPA_POD_CHOICE_RANGE_Int(
@@ -330,7 +335,7 @@ fixate_format:
 			sizeof(struct spa_meta_region) * 1,
 			sizeof(struct spa_meta_region) * 4));
 
-	pw_stream_update_params(stream, params, 4);
+	pw_stream_update_params(stream, params, 5);
 	spa_pod_dynamic_builder_clean(&b[0]);
 	spa_pod_dynamic_builder_clean(&b[1]);
 	spa_pod_dynamic_builder_clean(&b[2]);
@@ -453,6 +458,15 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
 		logprint(TRACE, "pipewire: timestamp %"PRId64, h->pts);
+	}
+	struct spa_meta_region *video_crop;
+	video_crop = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoCrop, sizeof(*video_crop));
+	if (video_crop)
+	{
+		video_crop->region.position.x = 0;
+		video_crop->region.position.y = 0;
+		video_crop->region.size.width = cast->current_frame.xdpw_buffer->width;
+		video_crop->region.size.height = cast->current_frame.xdpw_buffer->height;
 	}
 
 	struct spa_meta_videotransform *vt;
